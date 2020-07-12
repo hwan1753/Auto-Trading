@@ -49,7 +49,7 @@ class EBest:
 
         run_mode = "EBEST_"+mode
         config = configparser.ConfigParser()
-        config.read('confi/config.ini')
+        config.read('C:/Users/john1/Desktop/공부/git/Auto Trading/Auto-Trading/confi/config.ini')
         self.user = config[run_mode]['user']
         self.passwd = config[run_mode]['password']
         self.cert_passwd = config[run_mode]['cert_passwd']
@@ -65,7 +65,7 @@ class EBest:
 
 
     def login(self):
-        self.xa_session_client.ConnectServer(self.host, self.host)
+        self.xa_session_client.ConnectServer(self.host, self.port)
         self.xa_session_client.Login(self.user, self.passwd, self.cert_passwd, 0, 0)
         while XASession.login_state == 0:
             pythoncom.PumpWaitingMessages()
@@ -90,38 +90,48 @@ class EBest:
         time.sleep(1)
         print("current query cnt:", len(self.query_cnt))
         print(res, in_block_name, out_block_name)
+
+        # query_cnt(리스트 갯수)가 QUERY_LIMIT_10MIN(200개)를 넘으면 1초간 프로세스 정지
         while len(self.query_cnt) >= EBest.QUERY_LIMIT_10MIN:
             time.sleep(1)
             print("waiting for execute query... current query cht:", len(self.query_cnt))
+
+            # 1초가 지나면 query_cnt 리스트의 각 값과 현재 시각의 차이를 계산한 다음 filter를 이요해 LLIMIT_SECONDS(600개)를 넘지않는 요소들만 리스트에 담음.
             self.query_cnt = list(filter(lambda x: (datetime.today() - x).total_seconds() < EBest.LIMIT_SECONDS, self.query_cnt))
 
         xa_query = win32com.client.DispatchWithEvents("XA_DataSet.XAQuery", XAQuery)
+        # 리소스 파일을 불러옴
         xa_query.LoadFromResFile(XAQuery.RES_PATH + res + ".res")
         # in_block_name 설정
         for key, value in set_fields.items():
             xa_query.SetFieldData(in_block_name, key, 0, value)
+
+        # TR을 요청
         errorCode = xa_query.Request(0)
 
-        # 요청 후 대기
+        # 요청 후 대기  OnReceiveData 메소드 실행 -> tr_run_state 값 1로 변경
         waiting_cnt = 0
         while xa_query.tr_run_state == 0:
             waiting_cnt += 1
+            # Waiting 계속 출력하면 느려지므로 100,000번에 한번씩 출력
             if waiting_cnt % 100000 == 0:
                 print("Waiting....", self.xa_session_client.GetLastError())
             pythoncom.PumpWaitingMessages()
 
         # 결과 블록
         result = []
+        # 결과가 몇 개인지 확인 GetBlockCount : 블록이 Occurs라면 Occurs의 개수
         count = xa_query.GetBlockCount(out_block_name)
 
         for i in range(count):
             item = {}
             for field in out_fields:
+                # GetFieldData( TR의 블록명, 블록의 필드명, 블록의 Occurs Index)
                 value = xa_query.GetFieldData(out_block_name, field, i)
                 item[value] = value
             result.append(item)
 
-        # 제약시간 체크
+        # 제약시간 체크 + query_cnt에 현재시각 추가
         XAQuery.tr_run_state = 0
         self.query_cnt.append(datetime.today())
 
@@ -138,12 +148,248 @@ class EBest:
 
         return result
 
+    def get_code_list(self,market=None):
+        """
+        TR: t8436 코스피, 코스닥의 종목 리스트를 가져온다
+        :param market:str 전체(0), 코스피(1), 코스닥(2)
+        :return result:list 시장별 종목 리스트
+        """
+
+        if market != "ALL" and market != "KOSPI" and market != "KOSDAQ":
+            raise Exception("Need to market param(ALL, KOSPI, KOSDAQ)")
+
+        market_code = {"ALL": "0", "KOSPI": "1", "KOSDAQ": "2"}
+        in_params = {"gubun":market_code[market]}
+        out_params =['hname', 'shcode', 'expcode', 'etfgubun', 'memedan', 'gubun', 'spac_gubun']
+        result = self._excute_query("t8436","t8436InBlock","t8436OutBlock",*out_params,**in_params)
+        return result
+
+class Field:
+    t1101 = {
+        "t11010utBlock":{
+            "hname":"한글명",
+            "price":"현재가",
+            "sign":"전일대비구분",
+            "change":"전일대비",
+            "diff":"등락율",
+            "volume":"누적거래량",
+            "jnilclose": "전일종가",
+            "offerho1": "매도호가1",
+            "bidho1":"매수호가1",
+            "offerrem1": "매도호가수량1",
+            "bidrem1":"매수호가수량1",
+            "preoffercha1":"직전매도대비수량1",
+            "prebidcha1":"직전매수대비수량1",
+            "offerho2": "매도호가2",
+            "bidho2":"매수호가2",
+            "offerrem2": "매도호가수량2",
+            "bidrem2":"매수호가수량2",
+            "preoffercha2":"직전매도대비수량2",
+            "prebidcha2":"직전매수대비수량2",
+            "offerho2": "매도호가3",
+            "bidho3":"매수호가3",
+            "offerrem3": "매도호가수량3",
+            "bidrem3":"매수호가수량3",
+            "preoffercha3":"직전매도대비수량3",
+            "prebidcha3":"직전매수대비수량3",
+            "offerho4": "매도호가4",
+            "bidho4":"매수호가4",
+            "offerrem4": "매도호가수량4",
+            "bidrem4":"매수호가수량4",
+            "preoffercha4":"직전매도대비수량4",
+            "prebidcha4":"직전매수대비수량4",
+            "offerho5": "매도호가5",
+            "bidho5":"매수호가5",
+            "offerrem5": "매도호가수량5",
+            "bidrem5":"매수호가수량5",
+            "preoffercha5":"직전매도대비수량5",
+            "prebidcha5":"직전매수대비수량5",
+            "offerho6": "매도호가6",
+            "bidho6":"매수호가6",
+            "offerrem6": "매도호가수량6",
+            "bidrem6":"매수호가수량6",
+            "preoffercha6":"직전매도대비수량6",
+            "prebidcha6":"직전매수대비수량6",
+            "offerho7": "매도호가7",
+            "bidho7": "매수호가7",
+            "offerrem7": "매도호가수량7",
+            "bidrem7": "매수호가수량7",
+            "preoffercha7": "직전매도대비수량7",
+            "prebidcha7": "직전매수대비수량7",
+            "offerho8": "매도호가8",
+            "bidho8":"매수호가8",
+            "offerrem8": "매도호가수량8",
+            "bidrem8":"매수호가수량8",
+            "preoffercha8":"직전매도대비수량8",
+            "prebidcha8":"직전매수대비수량8",
+            "offerho9": "매도호가9",
+            "bidho9":"매수호가9",
+            "offerrem9": "매도호가수량9",
+            "bidrem9":"매수호가수량9",
+            "preoffercha9":"직전매도대비수량9",
+            "prebidcha9":"직전매수대비수량9",
+            "offerho10": "매도호가10",
+            "bidho10":"매수호가10",
+            "offerrem10": "매도호가수량10",
+            "bidrem10":"매수호가수량10",
+            "preoffercha10":"직전매도대비수량10",
+            "prebidcha10":"직전매수대비수량10",
+            "offer":"매도호가수량합",
+            "bid": "매수호가수량합",
+            "preoffercha":"직전매도대비수량합",
+            "prebidcha":"직전매수대비수량합",
+            "hotime":"수신시간",
+            "yeprice":"예상체결가격",
+            "yevolume":"예상체결수량",
+            "yesign":"예상체결전일구분",
+            "yechange":"예상체결전일대비",
+            "yediff":"예상체결등락율",
+            "tmoffer":"시간외매도잔량",
+            "tmbid":"시간외매수잔량",
+            "ho_status":"동시구분",
+            "shcode":"단축코드",
+            "uplmtprice":"상한가",
+            "dnlmtprice":"하한가",
+            "open":"시가",
+            "high":"고가",
+            "low":"저가"
+        }
+    }
+
+    t8436 = {
+        "t8436OutBlock":{
+            "hname":"종목명",
+            "shcode":"단축코드",
+            "expcode":"확장코드",
+            "etfgubun":"ETF구분(1: ETF2:ETN)",
+            "uplmtprice":"상한가",
+            "dnlmtprice":"하한가",
+            "jnilclose":"전일가",
+            "memedan":"주문수량단위",
+            "recprice":"기준가",
+            "gubun":"구분(1: 코스피2:코스닥)",
+            "bu12gubun":"증권그룹",
+            "spac_gubun":"기업인수목적회사여부(Y / N)",
+            "filler":"filler(미사용)"
+        }
+    }
+
+    t1305 = {
+        "t1305OutBlock":{
+            "date":"날짜",
+            "open":"시가",
+            "high":"고가",
+            "low":"저가",
+            "close":"종가",
+            "sign":"전일대비구분",
+            "change":"전일대비",
+            "diff":"등락율",
+            "volume":"누저거래량",
+            "diff_vol":"거래증가율",
+            "chdegree":"체결강도",
+            "sojinrate":"소진율",
+            "changerate":"회전율",
+            "fpvolume":"외인순매수",
+            "covolume":"기관순매수",
+            "shcode":"종목코드",
+            "value":"누적거래대금(단위:백만)",
+            "ppvolume":"개인순매수",
+            "o_sign":"시가대비구분",
+            "o_chagne":"시가대비",
+            "o_diff":"시가기준등락율",
+            "h_sign":"고가대비구분",
+            "h_change":"고가대비",
+            "h_diff":"고가기준등락율",
+            "l_sign":"저가대비구분",
+            "l_change":"저가대비",
+            "l_diff":"저가기준등락율",
+            "marketcap":"시가총액(단위:백만)"
+        }
+    }
+
+    t1921 = {
+        "t1921OutBlock":{
+            "mmdate": "날짜",
+            "close":"종가",
+            "sign":"전일대비구분",
+            "jchange":"전일대비",
+            "diff":"등락율",
+            "nvolume":"신규",
+            "svolume":"상환",
+            "jvolume":"잔고",
+            "price":"금액",
+            "chagne":"대비",
+            "gyrate":"공여율",
+            "jkrate":"잔고율",
+            "shcode":"종목코드"
+        }
+    }
+
+    t1717 = {
+        "t1717OutBlock":{
+            "date":"일자",
+            "close": "종가",
+            "sign": "전일대비구분",
+            "change": "전일대비",
+            "diff": "등락율",
+            "volume":"누적거래량",
+            "tjj000_vol":"사모펀드(순매수량)",
+            "tjj0001_vol":"증권(순매수량)",
+            "tjj0002_vol":"보험(순매수량)",
+            "tjj0003_vol":"투신(순매수량)",
+            "tjj0004_vol":"은행(순매수량)",
+            "tjj0005_vol":"종금(순매수량)",
+            "tjj0006_vol":"기금(순매수량)",
+            "tjj0007_vol":"기타법인(순매수량)",
+            "tjj0008_vol":"개인(순매수량)",
+            "tjj0009_vol":"등록외국인(순매수량)",
+            "tjj0010_vol":"미등록외국인(순매수량)",
+            "tjj0011_vol":"국가외(순매수량)",
+            "tjj0018_vol":"기관(순매수량)",
+            "tjj0016_vol":"외인계(순매수량)(등록+미등록)",
+            "tjj0017_vol":"기타계(순매수량)(기타+국가)",
+            "tjj0000_dan":"사모펀드(단가)",
+            "tjj0001_dan":"증권(단가)",
+            "tjj0002_dan": "보험(단가)",
+            "tjj0003_dan": "투신(단가)",
+            "tjj0004_dan": "은행(단가)",
+            "tjj0005_dan": "종금(단가)",
+            "tjj0006_dan": "기금(단가)",
+            "tjj0007_dan": "기타법인(단가)",
+            "tjj0008_dan": "개인(단가)",
+            "tjj0009_dan": "등록외국인(단가)",
+            "tjj00010_dan": "미등록외국인(단가)",
+            "tjj00011_dan": "국가외(단가)",
+            "tjj00018_dan": "기관(단가)",
+            "tjj00016_dan": "외인계(단가)(등록+미등록)",
+            "tjj00017_dan": "기타계(단가)(기타+국가)",
+        }
+    }
+
+    t1927 = {
+        "t1927OutBlock":{
+            "date":"일자",
+            "price":"현재가",
+            "sign":"전일대비구분",
+            "change":"전일대비",
+            "diff":"등락율",
+            "volume":"거래량",
+            "value":"거래대금",
+            "gm_vo":"공매도수량",
+            "gm_va":"공매도대금",
+            "gm_per":"공매도거래비중",
+            "gm_avg":"평균공매도단가",
+            "gm_vo_sum":"누적공매도수량"
+        }
+    }
+
+
 
 
 
 class XAQuery:
     # xingAPI에서 TR을 내려받은 폴더
-    RES_PATH = "C:/eBEST/xingAPI/Res"
+    RES_PATH = "C:/eBEST/xingAPI/Res/"
     # OnReceiveData에서 Data를 받으면 1로 바뀜
     tr_run_state = 0
 
@@ -155,3 +401,5 @@ class XAQuery:
     # 요청한 API에 대해 메시지를 수신했을 때 발생하는 이벤트
     def OnReceiveMessage(self, error, code, message):
         print("OnreceiveMessage", error, code, message)
+
+
