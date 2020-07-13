@@ -164,6 +164,80 @@ class EBest:
         result = self._excute_query("t8436","t8436InBlock","t8436OutBlock",*out_params,**in_params)
         return result
 
+    def get_stock_price_by_code(self,code=None,cnt="1"):
+        """
+        TR: t1305 현재 날짜를 기준으로 cnt 만큼 전일의 데이터를 가져온다
+        :param code:str 종목코드
+        :param cnt:str 이전 데이터 조회 범위(일단위)
+        :return result:list 종목의 최근 가격 정보
+        """
+
+        in_params = {"shcode":code, "dwmcode":"1","date":"","idx":"","cnt":cnt}
+        out_params = ['date', 'open', 'high', 'low', 'close', 'sign', 'change', 'diff',
+                      'vloume', 'diff_vol', 'chdegree', 'value', 'ppvolume', 'o_sign', 'o_change', 'o_diff',
+                      'h_sign', 'h_change', 'h_diff', 'l_sign', 'l_change', 'l_diff', 'marketcap']
+
+        result = self._excute_query("t1305","t1305InBlock", "t1305OutBlock1",*out_params, **in_params)
+        for item in result:
+            item["code"] = code
+        return result
+
+    def get_credit_trend_by_code(self,code=None,date=None):
+        """
+        TR: t1921 신용거래 동향
+        :param code:str 종목코드
+        :param date:str 날짜 ex)20200713
+        """
+
+        in_params = {"gubun":"0","shcode":code, "date":date, "idx":"0"}
+        out_params = ["mmdate","close","sign", "jchange", "diff", "nvolume",
+                      "svolume", "jvolume", "price", "change", "gyrate", "jkrate", "shcode"]
+
+        result = self._excute_query("t1921","t1921InBlock","t1921OutBlock1",*out_params,**in_params)
+
+        for item in result:
+            item["code"] = code
+        return result
+
+    def get_agent_trend_by_code(self, code=None, fromdt=None, todt=None):
+        """
+        TR: t1717 외인 기관별 종목별 동향
+        :param code:str 종목코드
+        :param fromdt:str 조회 시작 날짜
+        :param todt:str 조회 종료 날짜
+        :return result:list 시장별 종목 리스트
+        """
+        in_params = {"gubun":"0", "fromdt":fromdt, "todt":todt, "shcode":code}
+        out_params = ["date", "close", "sign", "change", "diff", "volume", "tjj0000_vol",
+                      "tjj0001_vol","tjj0002_vol","tjj0003_vol","tjj0004_vol", "tjj0005_vol", "tjj0006_vol",
+                      "tjj0007_vol","tjj0008_vol","tjj0009_vol","tjj0010_vol","tjj0011_vol","tjj0018_vol",
+                      "tjj0016_vol","tjj0017_vol","tjj0001_dan","tjj0002_dan","tjj0003_dan","tjj0004_dan",
+                      "tjj0005_dan","tjj0006_dan","tjj0007_dan","tjj0008_dan","tjj0009_dan","tjj0010_dan",
+                      "tjj0011_dan","tjj0018_dan","tjj0016_dan","tjj0017"]
+        result = self._excute_query("t1717","t1717InBlock","t1717OutBlock",*out_params,**in_params)
+
+        for item in result:
+            item["code"]=code
+        return result
+
+    def get_short_trend_by_code(self, code=None, sdate=None, edate=None):
+        """
+        TR: t1927 공매도일별추이
+        :param code:str 종목코드
+        :param sdate:str 시작일짜
+        :param edate:str 종료날짜
+        :return result:list 시장 별 종목 리스트
+        """
+        in_params = {"date":sdate, "sdate":sdate,"edate":edate,"shcode":code}
+        out_params = ["date", "price", "sign", "change", "diff", "volume", "value",
+                      "gm_vo", "gm_va", "gm_per", "gm_avg", "gm_vo_sum"]
+
+        result = self._excute_query("t1927", "t1927InBlock", "t1927OutBlock1", *out_params, **in_params)
+
+        for item in result:
+            item["code"] = code
+        return result
+
 class Field:
     t1101 = {
         "t11010utBlock":{
