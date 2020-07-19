@@ -3,17 +3,19 @@ import configparser
 import xml.etree.ElementTree as ET
 
 class  Data():
+
     CORP_CODE_URL = "http://api.seibro.or.kr/openapi/service/CorpSvc/getIssucoCustnoByNm"
     CORP_INFO_URL = "http://api.seibro.or.kr/openapi/service/CorpSvc/getIssucoBasicInfo"
-    STOCK_DISTRIBUTION_URL = "hhtp://api.seibro.or.kr/openapi/service/CorpSvc/getStkDistributionStatus"
+    STOCK_DISTRIBUTION_URL = "http://api.seibro.or.kr/openapi/service/CorpSvc/getStkDistributionShareholderStatus"
 
     def __init__(self):
         # ConfigParser()는 특수문자를 읽지 못하므로 여기서는 RawConfigParser()를 사용
         config = configparser.RawConfigParser()
-        config.read('conf/config.ini')
+        config.read('C:/Users/john1/Desktop/공부/git/Auto Trading/Auto-Trading/confi/config.ini')
         self.api_key = config["DATA"]["api_key"]
         if self.api_key is None:
             raise Exception("Need to api key")
+
 
     def get_corp_code(self, name = None):
         """
@@ -30,16 +32,18 @@ class  Data():
         request_url = self.CORP_CODE_URL+"?"
         for k, v in query_params.items():
             request_url = request_url + k + "=" + v + "&"
+        print(request_url)
 
 
         # [:-1]은 마지막 &값 제외. res는 반환값을 저장
-        res = request_url.get(request_url[:-1])
+        res = requests.get(request_url[:-1])
         
         # res.text 반환된 값의 본문. ET.fromstring 모듈로 XML 파싱
         root = ET.fromstring(res.text)
         # XML에서 items에 있는 item 노드 값을 찾음.
         from_tags = root.iter("items")
         result ={}
+
         for items in from_tags:
             for item in items.iter('item'):
                 if name in item.find('issucoNm').text.split():
@@ -55,10 +59,13 @@ class  Data():
         """
 
         query_params = {"ServiceKey":self.api_key, "issucoCustno": code.replace("0","")}
+
         request_url = self.CORP_INFO_URL+"?"
         for k, v in query_params.items():
-            request_url = request_url + k + "=" + k + "&"
-        res = request_url.get(request_url[:-1])
+            request_url = request_url + k + "=" + v + "&"
+            print(k,v)
+        res = requests.get(request_url[:-1])
+        print(request_url)
         root = ET.fromstring(res.text)
         from_tags = root.iter("item")
         result = {}
@@ -92,7 +99,7 @@ class  Data():
             request_url = request_url + k + "=" + v + "&"
         res = requests.get(request_url[:-1])
 
-        print(res.text)
+        print(request_url)
         root = ET.fromstring(res.text)
         from_tags = root.iter("items")
         result_list = []
@@ -105,4 +112,4 @@ class  Data():
                 result["stk_qty"] = item.find('stkqty').text
                 result["stk_qty_ratio"] = item.find('stkqtyRatio').text
                 result_list.append(result)
-        return result
+        return result_list
